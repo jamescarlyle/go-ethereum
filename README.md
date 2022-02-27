@@ -361,3 +361,39 @@ also included in our repository in the `COPYING.LESSER` file.
 The go-ethereum binaries (i.e. all code inside of the `cmd` directory) is licensed under the
 [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html), also
 included in our repository in the `COPYING` file.
+
+## Obscuro
+
+Obscuro adds a number of features and command line options.
+
+### Running L2 in an Enclave
+
+In order to run inside an Ego enclave, the following build steps are required:
+
+1. Change to the project root directory.
+2. The following code is required. See [this link](https://github.com/edgelesssys/ego/issues/75). "The problem is the missing glibc symbols. We currently only partially support glibc. You could try to change the build such that it links against musl libc. I never tried that yet. So if you succeed, please come back and tell us about your experience. If that doesn't work out, try to build with CGO_CFLAGS=-D_FORTIFY_SOURCE=0. This may reduce the number of missing symbols. For the remaining symbols, you'd need to provide stub implementations. It's often sufficient to just link empty functions to the app"
+```echo -e 'int __pthread_register_cancel() { return 0; }\nint __pthread_unregister_cancel() { return 0; }\nint __sigsetjmp() { return 0; }' > rpc/stubs.c```
+3. Create a datadir for Geth. Confirm the file mount specifications in enclave.json are correct.
+4. Note changes to account_cache.go and flags.go. Ego is based on OpenEnclave, which does not support certain syscalls like SYS_GETRLIMIT. Additionally, the keystore watcher code is disabled, because the operating system cannot provide file change events into the enclave.
+4. Compile with the following command:
+```CGO_CFLAGS=-D_FORTIFY_SOURCE=0 ego-go build ./cmd/geth```
+5. Move geth binary to location specified in enclave.json, e.g. /home/jwgcarlyle/geth/bin.
+6. Sign using enclave.json configuration:
+```ego sign```
+6. Start geth-l1 with a command such as this (doesn't need ego, but does need ws to allow the L2 node to connect):
+```/home/jwgcarlyle/geth-l1/bin/geth --dev --datadir /geth-l1 --http --http.port 8545 --http.corsdomain "https://remix.ethereum.org,moz-extension://aaac9e04-2a0d-45a8-bb45-7ad026ae5536" --http.api web3,eth,debug,personal,net --ws --ws.api web3,eth,debug,personal,net --ws.port 8546 console```
+6. Start geth-l2 with a command such as:
+```OE_SIMULATION=1 ego run /home/jwgcarlyle/geth-l2/bin/geth --dev --datadir /geth-l2 --http --http.port 8547 --http.corsdomain "https://remix.ethereum.org,moz-extension://aaac9e04-2a0d-45a8-bb45-7ad026ae5536" --http.api web3,eth,debug,personal,net --obscuroConnectionURL wss://localhost:8546 console```
+7. All changes required by Obscuro to base Geth are commented with the string `// Obscuro:` and then the description of the change itself.
+
+### Compiling and Deploying the L1 Contract.
+
+The L1 contract is in the ./aggregator directory. It is compiled using the following steps (e.g. using solc or solcjs):
+
+1. `solcjs rollupContract.sol --bin`
+2. `solcjs rollupContract.sol --abi`
+3. `/home/jwgcarlyle/geth-l1/bin/abigen --abi rollupContract.abi --pkg contract --out rollupContract.go`
+
+Then deploy the contract using your favorite deployment tool. Remix IDE is convenient for this.
+
+1. Take a note of the deployed rollup contract address, and update `aggregator.go`.

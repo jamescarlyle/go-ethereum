@@ -54,6 +54,8 @@ type Config struct {
 	GasPrice   *big.Int       // Minimum gas price for mining a transaction
 	Recommit   time.Duration  // The time interval for miner to re-create mining work.
 	Noverify   bool           // Disable remote mining solution verification(only useful in ethash).
+	// Obscuro: flag for whether to rollup or act independently.
+	Rollup bool
 }
 
 // Miner creates blocks and searches for proof-of-work values.
@@ -245,4 +247,13 @@ func (miner *Miner) GetSealingBlock(parent common.Hash, timestamp uint64, coinba
 // to the given channel.
 func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscription {
 	return miner.worker.pendingLogsFeed.Subscribe(ch)
+}
+
+// Obscuro: Generate rollup based on L1 block hash.
+func (miner *Miner) GenerateRollup(obscuroL1BlockHash common.Hash) {
+	miner.worker.obscuroMutex.Lock()
+	miner.worker.ObscuroL1Block = obscuroL1BlockHash
+	miner.worker.ObscuroL1BlockConsumed = false
+	miner.worker.obscuroMutex.Unlock()
+	log.Info("Setting Consumed to false")
 }

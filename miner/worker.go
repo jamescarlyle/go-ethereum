@@ -93,6 +93,8 @@ type environment struct {
 	txs      []*types.Transaction
 	receipts []*types.Receipt
 	uncles   map[common.Hash]*types.Header
+	// Obscuro: header which contains L1 block dependency.
+	obscuroHeader *types.ObscuroHeader // Added as a separate structure, so the hash function of Header is not affected.
 }
 
 // copy creates a deep copy of environment.
@@ -244,6 +246,11 @@ type worker struct {
 	skipSealHook func(*task) bool                   // Method to decide whether skipping the sealing.
 	fullTaskHook func()                             // Method to call before pushing the full sealing task.
 	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
+
+	// Obscuro: struct additions.
+	obscuroMutex           sync.RWMutex // Lock used to protect Obscuro fields.
+	ObscuroL1Block         common.Hash
+	ObscuroL1BlockConsumed bool
 }
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(header *types.Header) bool, init bool) *worker {
@@ -270,6 +277,10 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		startCh:            make(chan struct{}, 1),
 		resubmitIntervalCh: make(chan time.Duration),
 		resubmitAdjustCh:   make(chan *intervalAdjust, resubmitAdjustChanSize),
+
+		// Obscuro: set initial values.
+		ObscuroL1Block:         common.Hash{},
+		ObscuroL1BlockConsumed: true,
 	}
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
@@ -449,16 +460,19 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 	for {
 		select {
 		case <-w.startCh:
+			log.Info("newWorkLoop: Start")
 			clearPending(w.chain.CurrentBlock().NumberU64())
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)
 
 		case head := <-w.chainHeadCh:
+			log.Info("newWorkLoop: Processing chainHeadCh", "block number", head.Block.Number(), "from", head.Block.ReceivedFrom)
 			clearPending(head.Block.NumberU64())
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)
 
 		case <-timer.C:
+			log.Info("newWorkLoop: Processing timer")
 			// If sealing is running resubmit a new work cycle periodically to pull in
 			// higher priced transactions. Disable this overhead for pending blocks.
 			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
@@ -747,7 +761,8 @@ func (w *worker) resultLoop() {
 }
 
 // makeEnv creates a new environment for the sealing block.
-func (w *worker) makeEnv(parent *types.Block, header *types.Header, coinbase common.Address) (*environment, error) {
+// Obscuro: add the header.
+func (w *worker) makeEnv(parent *types.Block, header *types.Header, coinbase common.Address, obscuroHeader *types.ObscuroHeader) (*environment, error) {
 	// Retrieve the parent state to execute on top and start a prefetcher for
 	// the miner to speed block sealing up a bit.
 	state, err := w.chain.StateAt(parent.Root())
@@ -775,6 +790,8 @@ func (w *worker) makeEnv(parent *types.Block, header *types.Header, coinbase com
 		family:    mapset.NewSet(),
 		header:    header,
 		uncles:    make(map[common.Hash]*types.Header),
+		// Obscuro: header.
+		obscuroHeader: obscuroHeader,
 	}
 	// when 08 is processed ancestors contain 07 (quick block)
 	for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {
@@ -969,6 +986,23 @@ type generateParams struct {
 // either based on the last chain head or specified parent. In this function
 // the pending transactions are not filled yet, only the empty task returned.
 func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
+	// Obscuro: check we can build a rollup.
+	var obscuroHeader *types.ObscuroHeader = nil
+	if w.config.Rollup {
+		w.obscuroMutex.Lock()
+		if w.ObscuroL1BlockConsumed {
+			w.obscuroMutex.Unlock()
+			log.Info("L1 block previously used, abandoning rollup generation")
+			return nil, fmt.Errorf("l1 block previously used, stopping rollup generation")
+		}
+		log.Info("Using L1 block in creation of rollup")
+		w.ObscuroL1BlockConsumed = true
+		obscuroHeader = &types.ObscuroHeader{
+			ObscuroL1Block: w.ObscuroL1Block,
+		}
+		w.obscuroMutex.Unlock()
+	}
+
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
@@ -1021,7 +1055,7 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 	// Could potentially happen if starting to mine in an odd state.
 	// Note genParams.coinbase can be different with header.Coinbase
 	// since clique algorithm can modify the coinbase field in header.
-	env, err := w.makeEnv(parent, header, genParams.coinbase)
+	env, err := w.makeEnv(parent, header, genParams.coinbase, obscuroHeader)
 	if err != nil {
 		log.Error("Failed to create sealing context", "err", err)
 		return nil, err

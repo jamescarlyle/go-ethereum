@@ -35,8 +35,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/aggregator"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/fdlimit"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
@@ -522,6 +522,16 @@ var (
 	EthStatsURLFlag = cli.StringFlag{
 		Name:  "ethstats",
 		Usage: "Reporting URL of a ethstats service (nodename:secret@host:port)",
+	}
+	// Obscuro: connection flag.
+	ObscuroConnectionURLFlag = cli.StringFlag{
+		Name:  "obscuroConnectionURL",
+		Usage: "URL of an Ethereum L1 node (wss://host:port)",
+	}
+	// Obscuro: contract address.
+	ObscuroContractAddressFlag = cli.StringFlag{
+		Name:  "obscuroContractAddress",
+		Usage: "Contract address of Rollup contract (0x..)",
 	}
 	FakePoWFlag = cli.BoolFlag{
 		Name:  "fakepow",
@@ -1058,15 +1068,20 @@ func setLes(ctx *cli.Context, cfg *ethconfig.Config) {
 // MakeDatabaseHandles raises out the number of allowed file handles per process
 // for Geth and returns half of the allowance to assign to the database.
 func MakeDatabaseHandles() int {
-	limit, err := fdlimit.Maximum()
-	if err != nil {
-		Fatalf("Failed to retrieve file descriptor allowance: %v", err)
-	}
-	raised, err := fdlimit.Raise(uint64(limit))
-	if err != nil {
-		Fatalf("Failed to raise file descriptor allowance: %v", err)
-	}
-	return int(raised / 2) // Leave half for networking and other stuff
+	// Obscuro: EGO does not implement SYS_GETRLIMIT, so instead set a file descriptor
+	// limit which was previously adopted by Geth.
+
+	// limit, err := fdlimit.Maximum()
+	// if err != nil {
+	// 	Fatalf("Failed to retrieve file descriptor allowance: %v", err)
+	// }
+	// raised, err := fdlimit.Raise(uint64(limit))
+	// raised, err := fdlimit.Raise(2048)
+	// if err != nil {
+	// 	Fatalf("Failed to raise file descriptor allowance: %v", err)
+	// }
+	// return int(raised / 2) // Leave half for networking and other stuff
+	return 1024
 }
 
 // MakeAddress converts an account specified directly as a hex encoded string or
@@ -1401,6 +1416,10 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 	}
 	if ctx.GlobalIsSet(LegacyMinerGasTargetFlag.Name) {
 		log.Warn("The generic --miner.gastarget flag is deprecated and will be removed in the future!")
+	}
+	// Obscuro: set the rollup behaviour for the miner.
+	if ctx.GlobalIsSet(ObscuroConnectionURLFlag.Name) {
+		cfg.Rollup = true
 	}
 }
 
@@ -1750,6 +1769,14 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 func RegisterEthStatsService(stack *node.Node, backend ethapi.Backend, url string) {
 	if err := ethstats.New(stack, backend, backend.Engine(), url); err != nil {
 		Fatalf("Failed to register the Ethereum Stats service: %v", err)
+	}
+}
+
+// Obscuro: RegisterAggregatorService configures the Aggregator daemon and adds it to
+// the given node.
+func RegisterAggregatorService(stack *node.Node, backend ethapi.Backend, connectionUrl string, contractAddress common.Address) {
+	if err := aggregator.New(stack, backend, backend.Engine(), connectionUrl, contractAddress); err != nil {
+		Fatalf("Failed to register the Obscuro Aggregator service: %v", err)
 	}
 }
 

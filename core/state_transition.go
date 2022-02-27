@@ -17,15 +17,23 @@
 package core
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -155,8 +163,62 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 	return gas, nil
 }
 
+func RsaDecrypt(privateKey []byte, ciphertext []byte) ([]byte, error) {
+	block, _ := pem.Decode(privateKey)
+	if block == nil {
+		return nil, errors.New("cannot decrypt ciphertext")
+	}
+	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return rsa.DecryptPKCS1v15(rand.Reader, priv, ciphertext)
+}
+
 // NewStateTransition initialises and returns a new state transition object.
 func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
+	// Obscuro: pull apart the transaction embedded in the msg to decrypt the data from the client.
+	// Don't decrypt for contract creation, where the To address is nil.
+	if msg.To() == nil || len(msg.Data()) == 0 || len(msg.Value().Bits()) == 0 {
+		log.Info("no data decryption or value zero", "raw data:", msg.Data())
+		return &StateTransition{
+			gp:        gp,
+			evm:       evm,
+			msg:       msg,
+			gasPrice:  msg.GasPrice(),
+			gasFeeCap: msg.GasFeeCap(),
+			gasTipCap: msg.GasTipCap(),
+			value:     msg.Value(),
+			data:      msg.Data(),
+			state:     evm.StateDB,
+		}
+	}
+	// Obscuro: decrypt the transaction payload.
+	privateKey :=
+		[]byte(
+			`-----BEGIN RSA PRIVATE KEY-----
+MIICXQIBAAKBgQDlOJu6TyygqxfWT7eLtGDwajtNFOb9I5XRb6khyfD1Yt3YiCgQ
+WMNW649887VGJiGr/L5i2osbl8C9+WJTeucF+S76xFxdU6jE0NQ+Z+zEdhUTooNR
+aY5nZiu5PgDB0ED/ZKBUSLKL7eibMxZtMlUDHjm4gwQco1KRMDSmXSMkDwIDAQAB
+AoGAfY9LpnuWK5Bs50UVep5c93SJdUi82u7yMx4iHFMc/Z2hfenfYEzu+57fI4fv
+xTQ//5DbzRR/XKb8ulNv6+CHyPF31xk7YOBfkGI8qjLoq06V+FyBfDSwL8KbLyeH
+m7KUZnLNQbk8yGLzB3iYKkRHlmUanQGaNMIJziWOkN+N9dECQQD0ONYRNZeuM8zd
+8XJTSdcIX4a3gy3GGCJxOzv16XHxD03GW6UNLmfPwenKu+cdrQeaqEixrCejXdAF
+z/7+BSMpAkEA8EaSOeP5Xr3ZrbiKzi6TGMwHMvC7HdJxaBJbVRfApFrE0/mPwmP5
+rN7QwjrMY+0+AbXcm8mRQyQ1+IGEembsdwJBAN6az8Rv7QnD/YBvi52POIlRSSIM
+V7SwWvSK4WSMnGb1ZBbhgdg57DXaspcwHsFV7hByQ5BvMtIduHcT14ECfcECQATe
+aTgjFnqE/lQ22Rk0eGaYO80cc643BXVGafNfd9fcvwBMnk0iGX0XRsOozVt5Azil
+psLBYuApa66NcVHJpCECQQDTjI2AQhFc1yRnCU/YgDnSpJVm1nASoRUnU8Jfm3Oz
+uku7JUXcVpt08DFSceCEX9unCuMcT72rAQlLpdZir876
+-----END RSA PRIVATE KEY-----`)
+	rawData, _ := RsaDecrypt(privateKey, msg.Data())
+	var b strings.Builder
+	// Need to ignore the first two characters '0x' so start from third position.
+	for i := 2; i < len(rawData); i++ {
+		b.WriteByte(rawData[i])
+	}
+	decodedByteArray, _ := hex.DecodeString(b.String())
+	log.Info("decrypted data", "decrypted data:", decodedByteArray)
 	return &StateTransition{
 		gp:        gp,
 		evm:       evm,
@@ -165,9 +227,10 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 		gasFeeCap: msg.GasFeeCap(),
 		gasTipCap: msg.GasTipCap(),
 		value:     msg.Value(),
-		data:      msg.Data(),
+		data:      decodedByteArray,
 		state:     evm.StateDB,
 	}
+
 }
 
 // ApplyMessage computes the new state by applying the given message

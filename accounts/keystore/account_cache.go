@@ -209,7 +209,8 @@ func (ac *accountCache) maybeReload() {
 		}
 	}
 	// No watcher running, start it.
-	ac.watcher.start()
+	// Obscuro: watcher requires a SYSCALL, not implemented by OpenEnclave/EGO, so disable it.
+	// ac.watcher.start()
 	ac.throttle.Reset(minReloadInterval)
 	ac.mu.Unlock()
 	ac.scanAccounts()

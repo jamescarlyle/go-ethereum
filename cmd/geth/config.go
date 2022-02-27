@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/scwallet"
 	"github.com/ethereum/go-ethereum/accounts/usbwallet"
 	"github.com/ethereum/go-ethereum/cmd/utils"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/log"
@@ -89,6 +90,13 @@ type gethConfig struct {
 	Node     node.Config
 	Ethstats ethstatsConfig
 	Metrics  metrics.Config
+	Obscuro  obscuroConfig
+}
+
+// Obscuro: config for connection to L1.
+type obscuroConfig struct {
+	connectionURL   string `toml:",omitempty"`
+	contractAddress string `toml:",omitempty"`
 }
 
 func loadConfig(file string, cfg *gethConfig) error {
@@ -147,6 +155,13 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 	if ctx.GlobalIsSet(utils.EthStatsURLFlag.Name) {
 		cfg.Ethstats.URL = ctx.GlobalString(utils.EthStatsURLFlag.Name)
 	}
+	// Obscuro: load config for L1.
+	if ctx.GlobalIsSet(utils.ObscuroConnectionURLFlag.Name) {
+		cfg.Obscuro.connectionURL = ctx.GlobalString(utils.ObscuroConnectionURLFlag.Name)
+	}
+	if ctx.GlobalIsSet(utils.ObscuroContractAddressFlag.Name) {
+		cfg.Obscuro.contractAddress = ctx.GlobalString(utils.ObscuroContractAddressFlag.Name)
+	}
 	applyMetricConfig(ctx, &cfg)
 
 	return stack, cfg
@@ -170,6 +185,10 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	// Add the Ethereum Stats daemon if requested.
 	if cfg.Ethstats.URL != "" {
 		utils.RegisterEthStatsService(stack, backend, cfg.Ethstats.URL)
+	}
+	// Obscuro: Add the Obscuro Aggregator daemon if requested.
+	if cfg.Eth.Miner.Rollup { // && cfg.Obscuro.contractAddress != ""
+		utils.RegisterAggregatorService(stack, backend, cfg.Obscuro.connectionURL, common.HexToAddress(cfg.Obscuro.contractAddress))
 	}
 	return stack, backend
 }
