@@ -186,7 +186,7 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	if cfg.Ethstats.URL != "" {
 		utils.RegisterEthStatsService(stack, backend, cfg.Ethstats.URL)
 	}
-	// Obscuro: Add the Obscuro Aggregator daemon if requested.
+	// Obscuro: Add the Obscuro aggregator daemon if requested.
 	if cfg.Eth.Miner.Rollup { // && cfg.Obscuro.contractAddress != ""
 		utils.RegisterAggregatorService(stack, backend, cfg.Obscuro.connectionURL, common.HexToAddress(cfg.Obscuro.contractAddress))
 	}

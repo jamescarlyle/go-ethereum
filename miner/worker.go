@@ -93,7 +93,7 @@ type environment struct {
 	txs      []*types.Transaction
 	receipts []*types.Receipt
 	uncles   map[common.Hash]*types.Header
-	// Obscuro: header which contains L1 block dependency.
+	// Obscuro: Header which contains L1 block dependency.
 	obscuroHeader *types.ObscuroHeader // Added as a separate structure, so the hash function of Header is not affected.
 }
 

@@ -2,7 +2,7 @@ module github.com/obscuronet/go-ethereum
 
 go 1.15
 
-replace ./github.com/ethereum/go-ethereum => ./github.com/obscuronet/go-ethereum
+replace ./github.com/ethereum/go-ethereum => ./github.com/obscuronet/go-ethereum 
 
 require (
 	github.com/Azure/azure-pipeline-go v0.2.2 // indirect

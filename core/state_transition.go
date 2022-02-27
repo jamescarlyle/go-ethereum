@@ -177,7 +177,7 @@ func RsaDecrypt(privateKey []byte, ciphertext []byte) ([]byte, error) {
 
 // NewStateTransition initialises and returns a new state transition object.
 func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
-	// Obscuro: pull apart the transaction embedded in the msg to decrypt the data from the client.
+	// Obscuro: Pull apart the transaction embedded in the msg to decrypt the data from the client.
 	// Don't decrypt for contract creation, where the To address is nil.
 	if msg.To() == nil || len(msg.Data()) == 0 || len(msg.Value().Bits()) == 0 {
 		log.Info("no data decryption or value zero", "raw data:", msg.Data())

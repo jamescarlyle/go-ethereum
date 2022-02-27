@@ -95,7 +95,7 @@ type Header struct {
 
 // Obscuro: ObscuroHeader represents a block header in the L2 blockchain.
 // Note that Obscuro data cannot be added to Header, because then the hash value changes, and lookup on the L1 is still required.
-// Ultimately a separate L2 Header with full methods is needed.
+// Ultimately a separate L2 header with full methods is needed.
 type ObscuroHeader struct {
 	ObscuroL1Block common.Hash `json:"obscuroL1Block"`
 }

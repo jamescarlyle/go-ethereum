@@ -388,7 +388,7 @@ In order to run inside an Ego enclave, the following build steps are required:
 
 ### Compiling and Deploying the L1 Contract.
 
-The L1 contract is in the ./aggregator directory. It is compiled using the following steps (e.g. using solc or solcjs):
+The L1 contract is in the ./aggregator/contract directory. It is compiled using the following steps (e.g. using solc or solcjs):
 
 1. `solcjs rollupContract.sol --bin`
 2. `solcjs rollupContract.sol --abi`
@@ -397,3 +397,4 @@ The L1 contract is in the ./aggregator directory. It is compiled using the follo
 Then deploy the contract using your favorite deployment tool. Remix IDE is convenient for this.
 
 1. Take a note of the deployed rollup contract address, and update `aggregator.go`.
+ 

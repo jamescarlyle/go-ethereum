@@ -54,7 +54,7 @@ type Config struct {
 	GasPrice   *big.Int       // Minimum gas price for mining a transaction
 	Recommit   time.Duration  // The time interval for miner to re-create mining work.
 	Noverify   bool           // Disable remote mining solution verification(only useful in ethash).
-	// Obscuro: flag for whether to rollup or act independently.
+	// Obscuro: Flag for whether to rollup or act independently.
 	Rollup bool
 }
 

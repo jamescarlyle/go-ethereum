@@ -1772,7 +1772,7 @@ func RegisterEthStatsService(stack *node.Node, backend ethapi.Backend, url strin
 	}
 }
 
-// Obscuro: RegisterAggregatorService configures the Aggregator daemon and adds it to
+// Obscuro: RegisterAggregatorService configures the aggregator daemon and adds it to
 // the given node.
 func RegisterAggregatorService(stack *node.Node, backend ethapi.Backend, connectionUrl string, contractAddress common.Address) {
 	if err := aggregator.New(stack, backend, backend.Engine(), connectionUrl, contractAddress); err != nil {

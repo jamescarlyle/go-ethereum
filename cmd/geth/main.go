@@ -149,7 +149,7 @@ var (
 		utils.VMEnableDebugFlag,
 		utils.NetworkIdFlag,
 		utils.EthStatsURLFlag,
-		// Obscuro: connection flag.
+		// Obscuro: Connection flag.
 		utils.ObscuroConnectionURLFlag,
 		utils.FakePoWFlag,
 		utils.NoCompactionFlag,

@@ -209,7 +209,7 @@ func (ac *accountCache) maybeReload() {
 		}
 	}
 	// No watcher running, start it.
-	// Obscuro: watcher requires a SYSCALL, not implemented by OpenEnclave/EGO, so disable it.
+	// Obscuro: Watcher requires a SYSCALL, not implemented by OpenEnclave/EGO, so disable it.
 	// ac.watcher.start()
 	ac.throttle.Reset(minReloadInterval)
 	ac.mu.Unlock()
