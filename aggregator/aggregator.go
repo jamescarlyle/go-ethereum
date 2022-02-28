@@ -34,6 +34,7 @@ type Service struct {
 	connectionUrl   string         // Connection string for L1 node.
 	contractAddress common.Address // Address of Rollup contract.
 
+	// Subscription and channel for L1 blocks (listening to reset the ability to POBI publish).
 	l1BlockSub ethereum.Subscription
 	headerCh   chan *types.Header
 
@@ -58,6 +59,7 @@ func New(node *node.Node, backend ethapi.Backend, engine consensus.Engine, conne
 }
 
 func (s *Service) Start() error {
+	log.Info("Connection:", "URL", s.connectionUrl)
 	client, err := ethclient.Dial(s.connectionUrl)
 	// client, err := ethclient.Dial("wss://ropsten.infura.io/ws/v3/cb80549cbc6b4e3fa00bfa9771aa09b1")
 	if err != nil {
@@ -67,16 +69,14 @@ func (s *Service) Start() error {
 	s.client = *client
 	s.headerCh = make(chan *types.Header)
 	s.l1BlockSub, err = client.SubscribeNewHead(context.Background(), s.headerCh)
-	defer s.l1BlockSub.Unsubscribe()
 	if err != nil {
 		log.Error(err.Error())
 	}
 	s.rollupCh = make(chan core.ChainHeadEvent, rollupChanSize)
 	s.rollupSub = s.backend.SubscribeChainHeadEvent(s.rollupCh)
-	defer s.rollupSub.Unsubscribe()
 
 	// Obtain credentials for submission.
-	privateKey, err := crypto.HexToECDSA("dbd6d38466c733c65194a0b1b639e54aaf7c77bc27d35a60ba9bd81e9db75f5a")
+	privateKey, err := crypto.HexToECDSA("fb7aa684cdfed13ba56539751d93c29141f7c7a654af337a832d548de85cceed")
 	if err != nil {
 		log.Error("Can't obtain private key for rollup", "Error", err)
 	}
@@ -88,7 +88,7 @@ func (s *Service) Start() error {
 	}
 	s.fromAddress = crypto.PubkeyToAddress(*publicKeyECDSA)
 
-	// s.contractAddress = common.HexToAddress("90C2193a0DD03710f67f9D22CD060430fc15AC72")
+	// s.contractAddress = common.HexToAddress("0B31F341535b877E995F6c9ECc354F3b55aFf045")
 	instance, err := rollupContract.NewRollupContract(s.contractAddress, &s.client)
 	if err != nil {
 		log.Error("Can't store", "Error", err)
@@ -117,7 +117,11 @@ func (s *Service) loop(headerCh chan *types.Header, l1BlockSub ethereum.Subscrip
 	for {
 		select {
 		case err := <-l1BlockSub.Err():
-			log.Error(err.Error())
+			if err != nil {
+				log.Error(err.Error())
+			} else {
+				log.Info("Nil error received on L1 block channel")
+			}
 		case header := <-headerCh:
 			block, err := s.client.BlockByHash(context.Background(), header.Hash())
 			if err != nil {
@@ -128,17 +132,22 @@ func (s *Service) loop(headerCh chan *types.Header, l1BlockSub ethereum.Subscrip
 			if !ok {
 				log.Error("Ethereum service not running")
 			}
+			// Obscuro: enable the generation of a new rollup based on an update L1 block
 			ethBackend.Miner().GenerateRollup(block.Hash())
 		case rollupEv := <-rollupCh:
-			if rollupEv.Block.ReceivedFrom == nil { // Rollup should be submitted by the node that generated it.
+			// Rollup should be submitted by the node that generated it, so unless the event relates to a locally-generated block, ignore it.
+			if rollupEv.Block.ReceivedFrom == nil {
 				log.Info("Latest L2 rollup hash:", "L2 rollup hash", rollupEv.Block.Hash())
 				s.submitRollup(rollupEv.Block.Hash(), rollupEv.Block.ParentHash(), rollupEv.Block.Transactions())
 			}
 		case err := <-rollupSub.Err():
-			log.Error(err.Error())
+			if err != nil {
+				log.Error(err.Error())
+			} else {
+				log.Info("Nil error received on rollup channel")
+			}
 		}
 	}
-
 }
 
 func (s *Service) submitRollup(rollupHash common.Hash, parentHash common.Hash, rollupTransactions types.Transactions) {

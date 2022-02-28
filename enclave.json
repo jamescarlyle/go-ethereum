@@ -1,15 +1,15 @@
 {
- "exe": "/home/jwgcarlyle/geth/bin/geth",
- "key": "private.pem",
- "debug": true,
+ "exe": "/home/jwgcarlyle/geth-l2/bin/geth",
+ "key": "/home/jwgcarlyle/geth-l2/bin/private.pem",
+ "debug": false,
  "heapSize": 512,
  "executableHeap": false,
  "productID": 1,
  "securityVersion": 1,
  "mounts": [
     {
-        "source": "/home/jwgcarlyle/geth",
-        "target": "/geth",
+        "source": "/home/jwgcarlyle/geth-l2",
+        "target": "/geth-l2",
         "type": "hostfs",
         "readOnly": false
     },

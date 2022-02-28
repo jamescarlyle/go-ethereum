@@ -1418,7 +1418,7 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 		log.Warn("The generic --miner.gastarget flag is deprecated and will be removed in the future!")
 	}
 	// Obscuro: set the rollup behaviour for the miner.
-	if ctx.GlobalIsSet(ObscuroConnectionURLFlag.Name) {
+	if ctx.GlobalIsSet(ObscuroConnectionURLFlag.Name) && ctx.GlobalIsSet(ObscuroContractAddressFlag.Name) {
 		cfg.Rollup = true
 	}
 }

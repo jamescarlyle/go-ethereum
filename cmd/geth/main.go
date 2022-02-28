@@ -151,6 +151,7 @@ var (
 		utils.EthStatsURLFlag,
 		// Obscuro: Connection flag.
 		utils.ObscuroConnectionURLFlag,
+		utils.ObscuroContractAddressFlag,
 		utils.FakePoWFlag,
 		utils.NoCompactionFlag,
 		utils.GpoBlocksFlag,
