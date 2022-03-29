@@ -76,7 +76,7 @@ func (s *Service) Start() error {
 	s.rollupSub = s.backend.SubscribeChainHeadEvent(s.rollupCh)
 
 	// Obtain credentials for submission.
-	privateKey, err := crypto.HexToECDSA("fb7aa684cdfed13ba56539751d93c29141f7c7a654af337a832d548de85cceed")
+	privateKey, err := crypto.HexToECDSA("c019eaf364c31c9d13a0c3d9030d6530d15966290e33fd74bc66d86f5daf39fa")
 	if err != nil {
 		log.Error("Can't obtain private key for rollup", "Error", err)
 	}

@@ -381,14 +381,18 @@ In order to run inside an Ego enclave, the following build steps are required:
 6. Sign using enclave.json configuration:
 ```ego sign```
 6. Start geth-l1 with a command such as this (doesn't need ego, but does need ws to allow the L2 node to connect):
-```/home/jwgcarlyle/geth-l1/bin/geth --dev --datadir /geth-l1 --http --http.port 8545 --http.corsdomain "https://remix.ethereum.org,moz-extension://aaac9e04-2a0d-45a8-bb45-7ad026ae5536" --http.api web3,eth,debug,personal,net --ws --ws.api web3,eth,debug,personal,net --ws.port 8546 console```
+```/home/jwgcarlyle/geth-l1/bin/geth --dev --datadir /home/jwgcarlyle/geth-l1 --http --http.port 8545 --http.corsdomain "https://remix.ethereum.org,moz-extension://aaac9e04-2a0d-45a8-bb45-7ad026ae5536" --http.api web3,eth,debug,personal,net --ws --ws.api web3,eth,debug,personal,net --ws.port 8546 console```
 7. Set up a new L2 rollup user account on the L1 with `personal.newAccount("pass")`.
 8. Transfer funds to this new account `eth.sendTransaction({from: eth.accounts[0], to: eth.accounts[1], value: web3.toWei(100, "ether")})`
 9. Unlock this account using Metamask (configured for a local network on port 8545), by using the JSON key file previously displayed e.g. `path=/home/jwgcarlyle/geth-l1/keystore/UTC--2022-02-28T09-56-23.518100411Z--f91d049fc1749602ea2a86e828755d5b757eb34b`. The private key is needed to configure the L2 node.
 10. For now, update the L2 aggregator.go code with the private key extracted from Metamask.
-11. Start geth-l2 with a command such as:
-```OE_SIMULATION=1 ego run /home/jwgcarlyle/geth-l2/bin/geth --dev --datadir /home/jwgcarlyle/geth-l2/ --http --http.port 8547 --http.corsdomain "https://remix.ethereum.org,moz-extension://aaac9e04-2a0d-45a8-bb45-7ad026ae5536" --http.api web3,eth,debug,personal,net --ws --ws.api web3,eth,debug,personal,net --ws.port 8548 --obscuroConnectionURL "ws://localhost:8546" --obscuroContractAddress "0xe5a2ACAC8d219301A85f86f54aC2830827f51963" console```
-11. All changes required by Obscuro to base Geth are commented with the string `// Obscuro:` and then the description of the change itself.
+11. Compile the L2 app `GOBIN=/home/jwgcarlyle/geth-l2/bin CGO_CFLAGS=-D_FORTIFY_SOURCE=0 ego-go build  ./cmd/geth/`.
+12. Sign the app `ego sign`.
+13. Start geth-l2 with a command such as:
+```OE_SIMULATION=1 ego run /home/jwgcarlyle/geth-l2/bin/geth --dev --datadir /home/jwgcarlyle/geth-l2/ --http --http.port 8547 --http.corsdomain "https://remix.ethereum.org,moz-extension://aaac9e04-2a0d-45a8-bb45-7ad026ae5536" --http.api web3,eth,debug,personal,net --ws --ws.api web3,eth,debug,personal,net --ws.port 8548 --obscuroConnectionURL "ws://localhost:8546" --obscuroContractAddress "0x425f6aeC77DfBaE5083325b3737D166104ADf360" console```
+14. Set up a new L2 rollup user account on the L1 with `personal.newAccount("pass")`.
+15. Transfer funds to this new account `eth.sendTransaction({from: eth.accounts[0], to: eth.accounts[1], value: web3.toWei(100, "ether")})`
+16. All changes required by Obscuro to base Geth are commented with the string `// Obscuro:` and then the description of the change itself.
 "
 ### Compiling and Deploying the L1 Contract.
 

@@ -9,7 +9,7 @@
  "mounts": [
     {
         "source": "/home/jwgcarlyle/geth-l2",
-        "target": "/geth-l2",
+        "target": "/home/jwgcarlyle/geth-l2",
         "type": "hostfs",
         "readOnly": false
     },
